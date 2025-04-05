@@ -82,6 +82,14 @@ CLIPDROP_API_KEY=your_clipdrop_api_key
 streamlit run app.py
 ```
 
+## ⚙️ Processing Pipeline
+
+1. **Story Input & Analysis**
+2. **Panel Generation**
+3. **Image Creation**
+4. **Text Integration**
+5. **Final Assembly**
+
 ## 🧠 System Architecture
 
 ```mermaid
@@ -93,14 +101,6 @@ graph TD
     E --> F[Text Integration]
     F --> G[Final Comic Strip]
 ```
-
-## ⚙️ Processing Pipeline
-
-1. **Story Input & Analysis**
-2. **Panel Generation**
-3. **Image Creation**
-4. **Text Integration**
-5. **Final Assembly**
 
 ## 🧰 Tech Stack
 
@@ -152,35 +152,10 @@ ComicCrafter-AI/
 - [ ] Custom style training
 - [ ] Style mixing capabilities
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📬 Contact
-
-- **Project Link:** [https://github.com/yourusername/ComicCrafter-AI](https://github.com/yourusername/ComicCrafter-AI)
-- **Report Issues:** [Issue Tracker](https://github.com/yourusername/ComicCrafter-AI/issues)
-
-## 🙏 Acknowledgments
-
-- Google Generative AI team for Gemini Pro
-- Stability AI for ClipDrop API
-- The Streamlit team
-- All contributors and testers
 
 ---
 <div align="center">
-Made with ❤️ by Your Name
+Made with ❤️ Balajee
 
 ![Visitors](https://visitor-badge.laobi.icu/badge?page_id=yourusername.ComicCrafter-AI)
 </div>
