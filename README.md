@@ -4,8 +4,8 @@
 
 <div align="center" style="background-color: #f0f0f0; padding: 20px; border: 2px solid #333; border-radius: 10px; max-width: 900px;">
   <video width="800" controls>
-    <source src="Demo.mp4" type="video/mp4">
-    Your browser does not support the video tag. <a href="Demo.mp4">Click here to download the video</a>.
+    <source src="Demo_reencoded.mp4" type="video/mp4">
+    Your browser does not support the video tag. <a href="Demo_reencoded.mp4">Click here to download the video</a>.
   </video>
   <p style="color: #333; font-style: italic;">Transform Your Stories into Visual Adventures with AI-Powered Comic Generation</p>
   
