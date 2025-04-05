@@ -7,10 +7,6 @@ https://drive.google.com/file/d/1d81shRDNjODGUSOXxpbf3PQ7IaqqUbl-/view?usp=shari
 
 ComicCrafter AI is an innovative AI-powered comic generation system that transforms textual narratives into visually engaging comic strips. Using state-of-the-art AI models, it automates the entire comic creation pipeline - from story interpretation to final comic strip rendering, making comic creation accessible to everyone.
 
-<div align="center">
-  <img src="assets/system-architecture.png" alt="System Architecture">
-</div>
-
 ## Team Members
 - Anvesha
 - Balajee
