@@ -3,16 +3,6 @@
 ## 📺 Demo
 https://drive.google.com/file/d/1d81shRDNjODGUSOXxpbf3PQ7IaqqUbl-/view?usp=sharing
 
-
-<div align="center" style="background-color: #f0f0f0; padding: 20px; border: 2px solid #333; border-radius: 10px; max-width: 900px;">
-  <video width="800" controls>
-    <source src="[https://drive.google.com/file/d/1d81shRDNjODGUSOXxpbf3PQ7IaqqUbl-/view?usp=sharing]" type="video/mp4">
-    Your browser does not support the video tag. <a href="[https://drive.google.com/file/d/1d81shRDNjODGUSOXxpbf3PQ7IaqqUbl-/view?usp=sharing]">Click here to download the video</a>.
-  </video>
-  <p style="color: #333; font-style: italic;">Transform Your Stories into Visual Adventures with AI-Powered Comic Generation</p>
-  
-</div>
- 
 ## 📖 Overview
 
 ComicCrafter AI is an innovative AI-powered comic generation system that transforms textual narratives into visually engaging comic strips. Using state-of-the-art AI models, it automates the entire comic creation pipeline - from story interpretation to final comic strip rendering, making comic creation accessible to everyone.
@@ -20,6 +10,11 @@ ComicCrafter AI is an innovative AI-powered comic generation system that transfo
 <div align="center">
   <img src="assets/system-architecture.png" alt="System Architecture">
 </div>
+
+## Team Members
+- Anvesha
+- Balajee
+
 
 ## ✨ Key Features
 
