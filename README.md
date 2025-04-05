@@ -1,20 +1,18 @@
 # ComicCrafter AI 🎨
 
-<div align="center">
+## 📺 Demo
+
+<div align="center" style="background-color: #f0f0f0; padding: 20px; border: 2px solid #333; border-radius: 10px; max-width: 900px;">
   <video width="800" controls>
-    <source src="assets/Demo.mp4" type="video/mp4">
-    Your browser does not support the video tag. <a href="assets/ComicCrafter-demo.mp4">Click here to download the video</a>.
+    <source src="Demo.mp4" type="video/mp4">
+    Your browser does not support the video tag. <a href="Demo.mp4">Click here to download the video</a>.
   </video>
-  _Transform Your Stories into Visual Adventures with AI-Powered Comic Generation_
+  <p style="color: #333; font-style: italic;">Transform Your Stories into Visual Adventures with AI-Powered Comic Generation</p>
   
   [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
   [![Streamlit](https://img.shields.io/badge/Made%20with-Streamlit-FF4B4B.svg)](https://streamlit.io)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
-
-## 📺 Demo
-
-https://user-images.githubusercontent.com/your-username/your-repo/assets/video/Comic_crafter-demo-2025-04-05_08.11.31.mkv
 
 ## 📖 Overview
 
