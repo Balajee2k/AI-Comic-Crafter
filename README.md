@@ -1,19 +1,15 @@
 # ComicCrafter AI 🎨
 
 ## 📺 Demo
-
 <div align="center" style="background-color: #f0f0f0; padding: 20px; border: 2px solid #333; border-radius: 10px; max-width: 900px;">
   <video width="800" controls>
-    <source src="Demo_reencoded.mp4" type="video/mp4">
-    Your browser does not support the video tag. <a href="Demo_reencoded.mp4">Click here to download the video</a>.
+    <source src="[https://drive.google.com/file/d/1d81shRDNjODGUSOXxpbf3PQ7IaqqUbl-/view?usp=sharing]" type="video/mp4">
+    Your browser does not support the video tag. <a href="[https://drive.google.com/file/d/1d81shRDNjODGUSOXxpbf3PQ7IaqqUbl-/view?usp=sharing]">Click here to download the video</a>.
   </video>
   <p style="color: #333; font-style: italic;">Transform Your Stories into Visual Adventures with AI-Powered Comic Generation</p>
   
-  [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-  [![Streamlit](https://img.shields.io/badge/Made%20with-Streamlit-FF4B4B.svg)](https://streamlit.io)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
-
+ 
 ## 📖 Overview
 
 ComicCrafter AI is an innovative AI-powered comic generation system that transforms textual narratives into visually engaging comic strips. Using state-of-the-art AI models, it automates the entire comic creation pipeline - from story interpretation to final comic strip rendering, making comic creation accessible to everyone.
