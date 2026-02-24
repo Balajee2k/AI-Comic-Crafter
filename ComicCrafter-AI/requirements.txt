@@ -1,3 +1,5 @@
+# ComicCrafter AI v2.0 - Enhanced Edition with Regional LoRA
+# Core Dependencies
 streamlit>=1.28.0
 pillow>=10.0.0
 python-dotenv>=1.0.0
@@ -5,3 +7,35 @@ google-generativeai>=0.3.0
 requests>=2.31.0
 reportlab>=4.0.0
 pathlib
+
+# Enhanced Features Dependencies
+numpy>=1.24.0
+scipy>=1.11.0
+
+# v2.0: Regional LoRA Dependencies
+# For Replicate API (cloud-based, no GPU required)
+replicate>=0.20.0
+
+# Optional: For local GPU generation with Regional LoRA
+# Requires NVIDIA GPU with 8GB+ VRAM
+# torch>=2.0.0
+# diffusers>=0.25.0
+# transformers>=4.35.0
+# accelerate>=0.25.0
+# safetensors>=0.4.0
+# peft>=0.7.0
+
+# Optional: For advanced character consistency (CLIP-based)
+# Uncomment the following lines if you want embedding-based character tracking
+# torch>=2.0.0
+# transformers>=4.30.0
+# ftfy>=6.1.0
+# regex>=2023.0.0
+
+# Optional: For advanced image processing
+# opencv-python>=4.8.0
+
+# Development Dependencies (optional)
+# pytest>=7.0.0
+# black>=23.0.0
+# flake8>=6.0.0
