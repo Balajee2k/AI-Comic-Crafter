@@ -5,7 +5,7 @@ Research-grade AI Comic Generation System
 
 Features:
 - Character upload and reference image support
-- Multi-cultural comic tradition selection (15+ styles)
+- Curated multi-style comic tradition selection (stable core styles)
 - Emotion-driven dynamic panel layouts
 - Character consistency tracking
 - Quality evaluation metrics
@@ -15,6 +15,7 @@ Research Contributions:
 1. Character Consistency Engine with embedding-based tracking
 2. Emotion-Driven Layout System with comic grammar
 3. Multi-Cultural Style Adaptation across 15+ traditions
+3. Style Stability Optimization with a curated high-performing style set
 4. Quantitative Comic Quality Evaluation Framework
 """
 
@@ -22,6 +23,8 @@ import streamlit as st
 import os
 import base64
 import json
+from copy import deepcopy
+from datetime import datetime
 from PIL import Image
 import traceback
 from pathlib import Path
@@ -93,77 +96,32 @@ STYLE_TRADITIONS = {
     "Manga (Japanese)": {
         "tradition": "MANGA",
         "icon": "🇯🇵",
-        "description": "Black & white with screentones, right-to-left reading, expressive eyes, speed lines, dramatic close-ups"
+        "description": "High-contrast line art with screentones, expressive framing, and strong panel readability"
     },
     "Anime Style": {
         "tradition": "ANIME",
         "icon": "🌸",
-        "description": "Vibrant colors, cel shading, large expressive eyes, detailed hair, dynamic action poses"
+        "description": "Vibrant cel shading, expressive characters, and stable visual continuity across panels"
     },
     "American Superhero": {
         "tradition": "AMERICAN_SUPERHERO",
         "icon": "💥",
-        "description": "Bold outlines, heavy inking, saturated colors, exaggerated muscular features, dynamic splash pages"
+        "description": "Bold inking, dynamic poses, dramatic perspective, and high-impact action composition"
     },
     "Franco-Belgian (Tintin)": {
         "tradition": "FRANCO_BELGIAN",
         "icon": "🎨",
-        "description": "Clear line style, soft flat shading, rich detailed backgrounds, semi-realistic proportions"
-    },
-    "Manhwa (Korean)": {
-        "tradition": "MANHWA",
-        "icon": "🇰🇷",
-        "description": "Full color, vertical scroll format, realistic proportions, manhwa-style eyes, soft shading"
-    },
-    "Manhua (Chinese)": {
-        "tradition": "MANHUA",
-        "icon": "🇨🇳",
-        "description": "Full color, detailed backgrounds, martial arts focused, flowing action lines"
-    },
-    "Webcomic Modern": {
-        "tradition": "WEBCOMIC",
-        "icon": "💻",
-        "description": "Clean digital art, consistent colors, simplified backgrounds, meme-friendly expressions"
+        "description": "Clear ligne-claire linework, detailed backgrounds, and balanced storytelling compositions"
     },
     "Webtoon (Vertical)": {
         "tradition": "WEBTOON",
         "icon": "📱",
-        "description": "Vertical scroll format, full color, dramatic pacing, mobile-optimized layouts"
-    },
-    "Horror Comics": {
-        "tradition": "HORROR",
-        "icon": "👻",
-        "description": "Heavy shadows, unsettling angles, muted colors with red accents, detailed gore"
+        "description": "Modern digital comic rendering with soft shading and clean scene-to-scene continuity"
     },
     "Film Noir": {
         "tradition": "NOIR",
         "icon": "🎬",
-        "description": "High contrast B&W, heavy shadows, cynical atmosphere, dramatic lighting"
-    },
-    "Newspaper Strip": {
-        "tradition": "NEWSPAPER",
-        "icon": "📰",
-        "description": "Simple clear art, 3-4 panel format, punchy dialogue, daily comic style"
-    },
-    "Golden Age": {
-        "tradition": "GOLDEN_AGE",
-        "icon": "✨",
-        "description": "Vintage aesthetic, limited color palette, bold primary colors, classic heroic poses"
-    },
-    "Underground Comix": {
-        "tradition": "UNDERGROUND",
-        "icon": "🎸",
-        "description": "Counter-culture aesthetic, exaggerated grotesque, psychedelic elements, adult themes"
-    },
-    "Children's Illustrated": {
-        "tradition": "CHILDRENS",
-        "icon": "🧸",
-        "description": "Soft rounded shapes, bright primary colors, simple expressions, educational focus"
-    },
-    "Indie Graphic Novel": {
-        "tradition": "INDIE",
-        "icon": "📖",
-        "description": "Artistic experimental style, muted tones, literary focus, unique personal aesthetic"
+        "description": "Cinematic high-contrast mood, shadow-driven storytelling, and dramatic visual tension"
     }
 }
 
@@ -420,7 +378,7 @@ def display_emotional_arc(panel_data: list):
     st.markdown("### 🎭 Emotional Arc")
     
     emotions = [p.get('emotion', 'neutral') for p in panel_data]
-    intensities = [p.get('intensity', 0.5) for p in panel_data]
+    intensities = [p.get('emotion_intensity', p.get('intensity', 0.5)) for p in panel_data]
     
     # Simple text-based visualization
     arc_display = " → ".join([f"{e.upper()}" for e in emotions])
@@ -431,8 +389,205 @@ def display_emotional_arc(panel_data: list):
     st.progress(intensity_avg, text=f"Average Intensity: {intensity_avg:.0%}")
 
 
+def init_session_state():
+    """Initialize app-level session state used for iterative workflows."""
+    defaults = {
+        "comic_memory": None,
+        "user_prompt_input": "",
+        "story_genre_input": "Auto-detect",
+        "story_mood_input": "Auto-detect",
+        "target_audience_input": "General",
+        "surprise_characters": "",
+        "edit_request_input": "",
+        "pending_surprise_seed": None
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
+def apply_pending_surprise_seed():
+    """Apply surprise story values before widgets are instantiated in this run."""
+    seed = st.session_state.get("pending_surprise_seed")
+    if not seed:
+        return
+
+    st.session_state.user_prompt_input = seed.get("prompt", "")
+    st.session_state.story_genre_input = seed.get("genre", "Adventure")
+    st.session_state.story_mood_input = seed.get("mood", "Exciting")
+    st.session_state.target_audience_input = seed.get("audience", "General")
+    st.session_state.surprise_characters = seed.get("characters", "")
+    st.session_state.pending_surprise_seed = None
+
+
+def build_story_prompt(base_prompt: str, genre: str, mood: str, audience: str, extra_characters: str) -> str:
+    """Construct a richer story prompt while keeping the base user input intact."""
+    details = []
+    if genre and genre != "Auto-detect":
+        details.append(f"Genre: {genre}")
+    if mood and mood != "Auto-detect":
+        details.append(f"Mood: {mood}")
+    if audience:
+        details.append(f"Target audience: {audience}")
+    if extra_characters.strip():
+        details.append(f"Character notes: {extra_characters.strip()}")
+
+    if not details:
+        return base_prompt
+
+    return f"{base_prompt}\n\nAdditional constraints:\n- " + "\n- ".join(details)
+
+
+def create_image_generator(char_image_path: str,
+                           ref_image_path: str,
+                           character_description: str,
+                           character_name: str):
+    """Create and preconfigure the enhanced image generator."""
+    img_generator = generate_image.EnhancedImageGenerator()
+
+    if char_image_path:
+        img_generator.set_reference_image(char_image_path, "main_character")
+    if ref_image_path:
+        img_generator.set_style_reference(ref_image_path)
+    if character_description:
+        img_generator.set_character_description(character_description)
+    if character_name and character_description:
+        img_generator.set_character_description(character_description, character_name)
+
+    return img_generator
+
+
+def ensure_panel_images(img_generator,
+                        panel_data: list,
+                        image_paths: list,
+                        art_style: str,
+                        num_panels: int) -> list:
+    """
+    Ensure we end with exactly num_panels valid image files.
+
+    Strategy:
+    1) Keep valid generated paths.
+    2) Regenerate only missing panels.
+    3) If regeneration still fails, create placeholder image for that panel.
+    """
+    normalized_paths = [None] * num_panels
+
+    for idx in range(min(len(image_paths), num_panels)):
+        candidate = image_paths[idx]
+        if isinstance(candidate, str) and os.path.exists(candidate):
+            normalized_paths[idx] = candidate
+
+    for idx in range(num_panels):
+        if normalized_paths[idx]:
+            continue
+
+        try:
+            panel = panel_data[idx] if idx < len(panel_data) else {
+                "Description": "Story continues.",
+                "Text": "...",
+                "emotion": "neutral"
+            }
+            target_path = os.path.join(PANEL_FOLDER, f"panel_{idx+1:02d}.png")
+            regenerated = img_generator.generate_single_panel(
+                panel_data=panel,
+                art_style=art_style,
+                panel_number=idx + 1,
+                output_path=target_path,
+                use_enhanced=True
+            )
+            if regenerated and os.path.exists(regenerated):
+                normalized_paths[idx] = regenerated
+                continue
+        except Exception as e:
+            print(f"Panel {idx + 1} targeted regeneration failed: {e}")
+
+        # Final fallback: create placeholder so comic assembly can continue.
+        placeholder_path = os.path.join(PANEL_FOLDER, f"panel_{idx+1:02d}_placeholder.png")
+        try:
+            Image.new("RGB", (1024, 1024), color=(245, 245, 245)).save(placeholder_path, format="PNG")
+            normalized_paths[idx] = placeholder_path
+        except Exception as e:
+            print(f"Failed to create placeholder for panel {idx + 1}: {e}")
+
+    return normalized_paths
+
+
+def save_comic_memory(payload: dict):
+    """Persist the latest generated comic in session memory for iterative edits."""
+    data = deepcopy(payload)
+    data["updated_at"] = datetime.utcnow().isoformat()
+    st.session_state.comic_memory = data
+
+
+def render_session_comic(memory: dict):
+    """Render current in-session comic snapshot."""
+    if not memory:
+        return
+
+    st.subheader("🧠 Current Session Comic")
+    meta_cols = st.columns(3)
+    with meta_cols[0]:
+        st.caption(f"Title: {memory.get('story_data', {}).get('title', 'My Comic')}")
+    with meta_cols[1]:
+        st.caption(f"Style: {memory.get('art_style', 'Anime Style')}")
+    with meta_cols[2]:
+        st.caption(f"Panels: {len(memory.get('panel_data', []))}")
+
+    output_image_path = memory.get("output_image_path")
+    if output_image_path and os.path.exists(output_image_path):
+        st.image(output_image_path, caption="Latest Comic (Session Memory)", use_container_width=True)
+
+
+def regenerate_comic_outputs(memory: dict, use_dynamic_layout: bool, evaluate: bool = True) -> dict:
+    """Rebuild combined comic outputs (PNG/PDF) from stored session memory."""
+    panel_data = memory.get("panel_data", [])
+    image_paths = memory.get("image_paths", [])
+    panel_texts = [panel.get("Text", "...") for panel in panel_data]
+
+    output_image_path = memory.get("output_image_path", os.path.join(OUTPUT_FOLDER, "comic_strip_with_text.png"))
+    pdf_output_path = memory.get("pdf_output_path", os.path.join(OUTPUT_FOLDER, "comic_strip.pdf"))
+
+    process_comic.create_comic_strip_with_text(
+        image_paths,
+        panel_texts,
+        output_image_path,
+        panel_data=panel_data if use_dynamic_layout else None,
+        title=memory.get("story_data", {}).get("title", "My Comic"),
+        use_dynamic_layout=use_dynamic_layout
+    )
+
+    pdf_created = process_comic.create_comic_pdf(
+        output_image_path,
+        pdf_output_path,
+        story_data=memory.get("story_data", {}),
+        panel_data=panel_data,
+        evaluation_metrics=None
+    )
+
+    evaluation_metrics = None
+    if evaluate and ENHANCED_BACKEND:
+        try:
+            evaluator = ComicEvaluator()
+            evaluation_metrics = evaluator.evaluate(
+                panel_data=panel_data,
+                image_paths=image_paths,
+                story_data=memory.get("story_data", {})
+            )
+        except Exception as e:
+            print(f"Evaluation after edit failed: {e}")
+
+    memory["panel_texts"] = panel_texts
+    memory["output_image_path"] = output_image_path
+    memory["pdf_output_path"] = pdf_output_path
+    memory["pdf_created"] = pdf_created
+    memory["evaluation_metrics"] = evaluation_metrics
+    return memory
+
+
 # Apply styles
 set_enhanced_styles()
+init_session_state()
+apply_pending_surprise_seed()
 
 # --- Main UI ---
 st.title("🎨 ComicCrafter AI")
@@ -583,59 +738,86 @@ tab1, tab2, tab3 = st.tabs(["📝 Create Comic", "📖 Gallery", "📊 About"])
 with tab1:
     # Story input section
     col1, col2 = st.columns([2, 1])
-    
+
     with col1:
         st.markdown('<div class="feature-card">', unsafe_allow_html=True)
         st.subheader("1. 📝 Your Story Idea")
-        user_prompt = st.text_area(
-            "",
-            "",
-            height=150,
-            placeholder="Enter your story idea here...\n\ne.g., A forgetful wizard accidentally turns himself into different animals while trying to find his lost spellbook in his messy cottage. Each transformation leads to a humorous situation until he finally finds the book.",
-            label_visibility="collapsed"
-        )
-        
+
+        surprise_col1, surprise_col2 = st.columns([1.3, 1])
+        with surprise_col1:
+            st.caption("Need inspiration? Auto-generate a complete story and edit before rendering.")
+        with surprise_col2:
+            surprise_clicked = st.button("🎲 Surprise Me", use_container_width=True)
+
         # Optional story details
         with st.expander("📌 Additional Story Details (Optional)"):
             story_genre = st.selectbox(
                 "Genre",
-                ["Auto-detect", "Comedy", "Adventure", "Drama", "Horror", "Romance", "Sci-Fi", "Fantasy", "Slice of Life"]
+                ["Auto-detect", "Comedy", "Adventure", "Drama", "Horror", "Romance", "Sci-Fi", "Fantasy", "Slice of Life"],
+                key="story_genre_input"
             )
             story_mood = st.selectbox(
                 "Overall Mood",
-                ["Auto-detect", "Light-hearted", "Serious", "Dramatic", "Mysterious", "Exciting", "Emotional"]
+                ["Auto-detect", "Light-hearted", "Serious", "Dramatic", "Mysterious", "Exciting", "Emotional"],
+                key="story_mood_input"
             )
             target_audience = st.selectbox(
                 "Target Audience",
-                ["General", "Children", "Young Adult", "Adult", "All Ages"]
+                ["General", "Children", "Young Adult", "Adult", "All Ages"],
+                key="target_audience_input"
             )
+            st.text_area(
+                "Auto-generated Character Notes",
+                height=80,
+                key="surprise_characters",
+                placeholder="Character notes appear here when using Surprise Me"
+            )
+
+        user_prompt = st.text_area(
+            "Story Prompt",
+            height=150,
+            key="user_prompt_input",
+            placeholder="Enter your story idea here...\n\ne.g., A forgetful wizard accidentally turns himself into different animals while trying to find his lost spellbook in his messy cottage. Each transformation leads to a humorous situation until he finally finds the book.",
+            label_visibility="collapsed"
+        )
+
         st.markdown('</div>', unsafe_allow_html=True)
-    
+
     with col2:
         st.markdown('<div class="feature-card">', unsafe_allow_html=True)
         st.subheader("2. 🎨 Art Style")
-        
-        # Style selection with preview
+
         selected_style = st.selectbox(
-            "",
+            "Art Style",
             list(STYLE_TRADITIONS.keys()),
             label_visibility="collapsed"
         )
-        
+
         style_info = STYLE_TRADITIONS[selected_style]
         st.markdown(f"""
         **{style_info['icon']} {selected_style}**
-        
+
         {style_info['description']}
         """)
-        
-        # Extract simple style name for backend
-        art_style = selected_style.split(" (")[0].replace("-", " ")
+
+        art_style = selected_style
         st.markdown('</div>', unsafe_allow_html=True)
-    
+
+    if surprise_clicked:
+        if not BACKEND_AVAILABLE:
+            st.error("🚨 Backend functions are unavailable. Cannot generate a surprise story.")
+        else:
+            try:
+                with st.spinner("Creating a surprise story seed..."):
+                    seed = generate_panels.generate_surprise_story_seed(art_style, num_panels)
+                st.session_state.pending_surprise_seed = seed
+                st.success("✨ Surprise story generated. Review or edit it, then click Generate Comic Strip.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to generate surprise story: {e}")
+
     st.divider()
-    
-    # Generate button
+
     col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
     with col_btn2:
         generate_button = st.button(
@@ -643,8 +825,7 @@ with tab1:
             use_container_width=True,
             type="primary"
         )
-    
-    # --- Processing Logic ---
+
     if generate_button:
         if not user_prompt:
             st.warning("⚠️ Please enter a story prompt before generating.", icon="✍️")
@@ -659,52 +840,40 @@ with tab1:
         panel_texts = []
         story_data = None
         evaluation_metrics = None
-        success = False
-        
-        # Save reference images if uploaded
+
         ref_image_path = None
         char_image_path = None
-        
+
         if reference_image:
-            ref_image_path = save_uploaded_image(
-                reference_image, 
-                REFERENCE_FOLDER, 
-                "style_reference.png"
-            )
-        
+            ref_image_path = save_uploaded_image(reference_image, REFERENCE_FOLDER, "style_reference.png")
+
         if character_image:
-            char_image_path = save_uploaded_image(
-                character_image, 
-                REFERENCE_FOLDER, 
-                "character_reference.png"
-            )
+            char_image_path = save_uploaded_image(character_image, REFERENCE_FOLDER, "character_reference.png")
 
         try:
             progress_bar = st.progress(0, text="Starting comic generation...")
-            
-            # --- Step 1: Generate Story ---
+
+            full_story_prompt = build_story_prompt(
+                user_prompt,
+                st.session_state.story_genre_input,
+                st.session_state.story_mood_input,
+                st.session_state.target_audience_input,
+                st.session_state.surprise_characters
+            )
+
             progress_bar.progress(10, text="⏳ Step 1/5: Generating story...")
             with st.spinner(""):
-                story_data = generate_panels.generate_story(user_prompt, art_style)
+                story_data = generate_panels.generate_story(full_story_prompt, art_style)
             progress_bar.progress(20, text="✅ Story generated!")
 
-            # --- Step 2: Generate Panels with proper num_panels ---
             progress_bar.progress(25, text=f"⏳ Step 2/5: Generating {num_panels} panel descriptions...")
             with st.spinner(""):
-                # ALWAYS pass num_panels to generate_panels
-                try:
-                    panel_data = generate_panels.generate_panels(user_prompt, art_style, num_panels)
-                except Exception as e:
-                    print(f"Panel generation error: {e}")
-                    st.error(f"Panel generation failed: {e}")
-                    st.stop()
-            
-            # Validate and adjust panel count
+                panel_data = generate_panels.generate_panels(full_story_prompt, art_style, num_panels)
+
             if not isinstance(panel_data, list):
                 st.error("❌ Error: Panel data is invalid.")
                 st.stop()
-                
-            # Ensure we have exactly num_panels
+
             if len(panel_data) > num_panels:
                 panel_data = panel_data[:num_panels]
             elif len(panel_data) < num_panels:
@@ -716,27 +885,22 @@ with tab1:
                         "relative_size": "medium",
                         "emotion_intensity": 0.5
                     })
-            
-            progress_bar.progress(40, text=f"✅ {len(panel_data)} panels generated!")
 
             panel_texts = [panel.get("Text", "...") for panel in panel_data]
+            progress_bar.progress(40, text=f"✅ {len(panel_data)} panels generated!")
 
-            # --- Step 3: Generate Images with FULL integration ---
             progress_bar.progress(45, text="⏳ Step 3/5: Generating panel images... (This may take a while!)")
+            img_generator = None
             with st.spinner(""):
-                # Check if Regional LoRA should be used
                 use_regional = (
-                    REGIONAL_LORA_AVAILABLE and 
-                    use_regional_lora and 
+                    REGIONAL_LORA_AVAILABLE and
+                    use_regional_lora and
                     character_image is not None
                 )
-                
+
                 if use_regional:
-                    # === REGIONAL LORA v2.0 GENERATION ===
                     st.info("🧬 Using Regional LoRA v2.0 for character consistency...")
-                    
                     try:
-                        # Initialize Regional Controller
                         regional_config = RegionalConfig(
                             image_width=1024,
                             image_height=1024,
@@ -744,16 +908,10 @@ with tab1:
                             num_inference_steps=28,
                             guidance_scale=7.5
                         )
-                        
-                        controller = RegionalLoRAController(
-                            config=regional_config,
-                            lora_cache_dir="LORA_CACHE"
-                        )
-                        
-                        # Save to session state for metrics viewing
+
+                        controller = RegionalLoRAController(config=regional_config, lora_cache_dir="LORA_CACHE")
                         st.session_state.regional_controller = controller
-                        
-                        # Register main character with reference image
+
                         if character_name and character_description and char_image_path:
                             lora_method_clean = "instant" if "instant" in lora_method else "trained"
                             controller.register_character(
@@ -763,15 +921,11 @@ with tab1:
                                 train_lora=True,
                                 lora_method=lora_method_clean
                             )
-                            st.success(f"✅ Registered {character_name} with LoRA")
-                        
-                        # Register secondary characters if provided
+
+                        all_characters = [c for c in [character_name, character2_name, character3_name] if c]
+
                         if character2_name and character2_desc:
-                            char2_path = None
-                            if character2_image:
-                                char2_path = save_uploaded_image(
-                                    character2_image, REFERENCE_FOLDER, "character2_reference.png"
-                                )
+                            char2_path = save_uploaded_image(character2_image, REFERENCE_FOLDER, "character2_reference.png") if character2_image else None
                             controller.register_character(
                                 name=character2_name,
                                 description=character2_desc,
@@ -779,14 +933,9 @@ with tab1:
                                 train_lora=char2_path is not None,
                                 lora_method="instant"
                             )
-                            st.success(f"✅ Registered {character2_name}")
-                        
+
                         if character3_name and character3_desc:
-                            char3_path = None
-                            if character3_image:
-                                char3_path = save_uploaded_image(
-                                    character3_image, REFERENCE_FOLDER, "character3_reference.png"
-                                )
+                            char3_path = save_uploaded_image(character3_image, REFERENCE_FOLDER, "character3_reference.png") if character3_image else None
                             controller.register_character(
                                 name=character3_name,
                                 description=character3_desc,
@@ -794,28 +943,13 @@ with tab1:
                                 train_lora=char3_path is not None,
                                 lora_method="instant"
                             )
-                            st.success(f"✅ Registered {character3_name}")
-                        
-                        # Build character list
-                        all_characters = []
-                        if character_name:
-                            all_characters.append(character_name)
-                        if character2_name:
-                            all_characters.append(character2_name)
-                        if character3_name:
-                            all_characters.append(character3_name)
-                        
-                        # Generate panels with Regional LoRA
+
                         image_paths = []
                         for i, panel in enumerate(panel_data):
                             progress_pct = 45 + int((i / len(panel_data)) * 30)
                             progress_bar.progress(progress_pct, text=f"⏳ Generating panel {i+1}/{len(panel_data)}...")
-                            
-                            # Get characters for this panel
-                            panel_chars = panel.get("characters", all_characters)
-                            if not panel_chars:
-                                panel_chars = all_characters
-                            
+
+                            panel_chars = panel.get("characters", all_characters) or all_characters
                             result = controller.generate_panel(
                                 description=panel.get("Description", ""),
                                 characters=panel_chars,
@@ -823,216 +957,283 @@ with tab1:
                                 panel_number=i + 1,
                                 emotion=panel.get("emotion", "neutral")
                             )
-                            
-                            # Save image
+
                             output_path = os.path.join(PANEL_FOLDER, f"panel_{i+1:02d}.png")
                             result.image.save(output_path)
                             image_paths.append(output_path)
-                            
-                            # Show layout preview if enabled
+
                             if show_layout_preview and i == 0:
                                 layout_preview = controller.visualize_layout(result, show_masks=True)
                                 st.image(layout_preview, caption=f"Panel {i+1} Layout + Masks", width=400)
-                        
-                        st.success(f"✅ Generated {len(image_paths)} panels with Regional LoRA")
-                        
+
                     except Exception as e:
                         st.warning(f"⚠️ Regional LoRA failed: {e}. Falling back to standard generation.")
                         print(f"Regional LoRA error: {e}")
-                        import traceback
-                        traceback.print_exc()
                         use_regional = False
-                
+
                 if not use_regional:
-                    # === STANDARD IMAGE GENERATION ===
-                    # Create enhanced image generator
-                    try:
-                        img_generator = generate_image.EnhancedImageGenerator()
-                        
-                        # Set character reference image if uploaded
-                        if char_image_path:
-                            img_generator.set_reference_image(char_image_path, "main_character")
-                            st.info(f"📷 Using character reference: {char_image_path}")
-                        
-                        # Set style reference if uploaded
-                        if ref_image_path:
-                            img_generator.set_style_reference(ref_image_path)
-                            st.info(f"🎨 Using style reference: {ref_image_path}")
-                        
-                        # Set character description if provided (this is KEY for consistency)
-                        if character_description:
-                            img_generator.set_character_description(character_description)
-                            st.info(f"👤 Character: {character_description[:80]}...")
-                        
-                        # If character name provided, register it too
-                        if character_name and character_description:
-                            img_generator.set_character_description(character_description, character_name)
-                        
-                        # Generate images using enhanced generator with proper style
-                        image_paths = list(img_generator.generate_images(panel_data, art_style, use_enhanced=True))
-                        
-                    except Exception as e:
-                        print(f"Enhanced image generator error: {e}")
-                        st.warning(f"⚠️ Using fallback image generator: {e}")
-                        # Fallback to legacy generator
-                        image_paths = list(generate_image.generate_images(panel_data, art_style))
-            
+                    img_generator = create_image_generator(
+                        char_image_path=char_image_path,
+                        ref_image_path=ref_image_path,
+                        character_description=character_description,
+                        character_name=character_name
+                    )
+                    image_paths = list(img_generator.generate_images(panel_data, art_style, use_enhanced=True))
+
+            # If some panels fail from API errors/timeouts, recover them individually.
+            if len(image_paths) < num_panels or any(
+                not isinstance(path, str) or not os.path.exists(path)
+                for path in image_paths[:num_panels]
+            ):
+                if img_generator is None:
+                    img_generator = create_image_generator(
+                        char_image_path=char_image_path,
+                        ref_image_path=ref_image_path,
+                        character_description=character_description,
+                        character_name=character_name
+                    )
+                image_paths = ensure_panel_images(
+                    img_generator=img_generator,
+                    panel_data=panel_data,
+                    image_paths=image_paths,
+                    art_style=art_style,
+                    num_panels=num_panels
+                )
+
             progress_bar.progress(75, text="✅ Images generated!")
 
-            paths_ok = False
-            if len(image_paths) >= num_panels:
-                all_valid = True
-                for i, img_path in enumerate(image_paths[:num_panels]):
-                    is_str = isinstance(img_path, str)
-                    exists = os.path.exists(img_path) if is_str else False
-                    if not is_str or not exists:
-                        all_valid = False
-                        st.warning(f"⚠️ Problem with generated path/file for panel {i+1}: '{img_path}'")
-                        break
-                if all_valid:
-                    paths_ok = True
-                    image_paths = image_paths[:num_panels]
-            else:
-                st.warning(f"⚠️ Expected {num_panels} image paths, but received {len(image_paths)}.")
+            image_paths = image_paths[:num_panels]
+            for i, img_path in enumerate(image_paths):
+                if not isinstance(img_path, str) or not os.path.exists(img_path):
+                    st.error(f"❌ Invalid generated image for panel {i+1}: {img_path}")
+                    st.stop()
 
-            # --- Step 4: Assemble Comic ---
-            if paths_ok:
-                output_image_path = os.path.join(OUTPUT_FOLDER, "comic_strip_with_text.png")
-                pdf_output_path = os.path.join(OUTPUT_FOLDER, "comic_strip.pdf")
+            output_image_path = os.path.join(OUTPUT_FOLDER, "comic_strip_with_text.png")
+            pdf_output_path = os.path.join(OUTPUT_FOLDER, "comic_strip.pdf")
 
-                progress_bar.progress(80, text="⏳ Step 4/5: Assembling comic strip...")
-                with st.spinner(""):
-                    # Use dynamic layout if enabled and panel_data has emotion info
-                    title = story_data.get('title', 'My Comic') if story_data else 'My Comic'
-                    
-                    process_comic.create_comic_strip_with_text(
-                        image_paths, 
-                        panel_texts, 
-                        output_image_path,
-                        panel_data=panel_data if use_dynamic_layout else None,
-                        title=title,
-                        use_dynamic_layout=use_dynamic_layout
-                    )
-                
-                progress_bar.progress(90, text="✅ Comic assembled!")
+            progress_bar.progress(80, text="⏳ Step 4/5: Assembling comic strip...")
+            with st.spinner(""):
+                process_comic.create_comic_strip_with_text(
+                    image_paths,
+                    panel_texts,
+                    output_image_path,
+                    panel_data=panel_data if use_dynamic_layout else None,
+                    title=story_data.get('title', 'My Comic') if story_data else 'My Comic',
+                    use_dynamic_layout=use_dynamic_layout
+                )
 
-                # --- Step 5: Create PDF and Evaluate ---
-                progress_bar.progress(92, text="⏳ Step 5/5: Creating PDF and evaluating quality...")
-                with st.spinner(""):
-                    # Create enhanced PDF
-                    pdf_created = process_comic.create_comic_pdf(
-                        output_image_path,
-                        pdf_output_path,
-                        story_data=story_data,
-                        panel_data=panel_data,
-                        evaluation_metrics=None  # Will add after evaluation
-                    )
-                    
-                    # Evaluate quality if enhanced backend available
-                    if ENHANCED_BACKEND:
-                        try:
-                            evaluator = ComicEvaluator()
-                            evaluation_metrics = evaluator.evaluate(
-                                panel_data=panel_data,
-                                image_paths=image_paths,
-                                story_data=story_data
-                            )
-                        except Exception as e:
-                            print(f"Evaluation failed: {e}")
-                            evaluation_metrics = None
-                
-                progress_bar.progress(100, text="✅ Complete!")
+            progress_bar.progress(92, text="⏳ Step 5/5: Creating PDF and evaluating quality...")
+            with st.spinner(""):
+                pdf_created = process_comic.create_comic_pdf(
+                    output_image_path,
+                    pdf_output_path,
+                    story_data=story_data,
+                    panel_data=panel_data,
+                    evaluation_metrics=None
+                )
 
-                # --- Display Results ---
-                if os.path.exists(output_image_path):
-                    st.balloons()
-                    st.success("🎉 Comic Generated Successfully!")
-                    
-                    # Story and Comic Display
-                    st.markdown('<div class="story-card">', unsafe_allow_html=True)
-                    
-                    result_col1, result_col2 = st.columns([1, 1.5])
-                    
-                    with result_col1:
-                        st.subheader("📖 Your Story")
-                        if story_data and 'title' in story_data:
-                            st.markdown(f"### {story_data['title']}")
-                            for section in ['introduction', 'storyline', 'climax', 'resolution', 'moral']:
-                                if section in story_data and story_data[section]:
-                                    st.markdown(f"**{section.capitalize()}:** {story_data[section]}")
-                        else:
-                            st.write("Story data not available")
-                        
-                        # Emotional arc display
-                        if panel_data and ENHANCED_BACKEND:
-                            display_emotional_arc(panel_data)
-                    
-                    with result_col2:
-                        st.subheader("🎨 Your Comic")
-                        st.image(
-                            output_image_path, 
-                            caption="Your Generated Comic Strip", 
-                            use_container_width=True
+                if ENHANCED_BACKEND:
+                    try:
+                        evaluator = ComicEvaluator()
+                        evaluation_metrics = evaluator.evaluate(
+                            panel_data=panel_data,
+                            image_paths=image_paths,
+                            story_data=story_data
                         )
-                    
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    # Evaluation Metrics
-                    if evaluation_metrics:
-                        st.divider()
-                        display_metrics(evaluation_metrics)
-                    
-                    # Download Section
-                    st.divider()
-                    st.subheader("⬇️ Download Your Comic")
-                    
-                    dl_col1, dl_col2, dl_col3 = st.columns(3)
-                    
-                    with dl_col1:
-                        with open(output_image_path, "rb") as img_file:
-                            st.download_button(
-                                label="📷 Download as PNG",
-                                data=img_file,
-                                file_name="comic_strip.png",
-                                mime="image/png",
-                                use_container_width=True
-                            )
-                    
-                    with dl_col2:
-                        if pdf_created and os.path.exists(pdf_output_path):
-                            with open(pdf_output_path, "rb") as pdf_file:
-                                st.download_button(
-                                    label="📄 Download as PDF",
-                                    data=pdf_file,
-                                    file_name="comic_strip.pdf",
-                                    mime="application/pdf",
-                                    use_container_width=True
-                                )
-                        else:
-                            st.button("📄 PDF Unavailable", disabled=True, use_container_width=True)
-                    
-                    with dl_col3:
-                        # Export individual panels
-                        if st.button("🖼️ Export Panels", use_container_width=True):
-                            panels_folder = os.path.join(OUTPUT_FOLDER, "individual_panels")
-                            exported = process_comic.export_individual_panels(
-                                image_paths, panels_folder, panel_texts
-                            )
-                            st.success(f"✅ Exported {len(exported)} panels to {panels_folder}")
-                    
-                    success = True
+                    except Exception as e:
+                        print(f"Evaluation failed: {e}")
 
-                else:
-                    st.error("❌ Error: Final comic image file was not found.")
-            else:
-                st.error("❌ Something went wrong! Image generation failed or produced invalid/missing files.")
+            progress_bar.progress(100, text="✅ Complete!")
+
+            memory = {
+                "story_prompt": full_story_prompt,
+                "story_data": story_data,
+                "panel_data": panel_data,
+                "panel_texts": panel_texts,
+                "image_paths": image_paths,
+                "art_style": art_style,
+                "num_panels": num_panels,
+                "reference_image_path": ref_image_path,
+                "character_image_path": char_image_path,
+                "character_name": character_name,
+                "character_description": character_description,
+                "use_dynamic_layout": use_dynamic_layout,
+                "output_image_path": output_image_path,
+                "pdf_output_path": pdf_output_path,
+                "pdf_created": pdf_created,
+                "evaluation_metrics": evaluation_metrics,
+                "used_regional_lora": bool(REGIONAL_LORA_AVAILABLE and use_regional_lora and character_image is not None)
+            }
+            save_comic_memory(memory)
+
+            st.balloons()
+            st.success("🎉 Comic Generated Successfully! You can now iteratively edit individual panels below.")
 
         except Exception as e:
-            st.error(f"💥 An unexpected error occurred during the generation process!")
+            st.error("💥 An unexpected error occurred during the generation process!")
             with st.expander("Show Error Details"):
                 st.error(f"{e}")
                 st.code(traceback.format_exc())
             print(traceback.format_exc())
+
+    memory = st.session_state.comic_memory
+    if memory:
+        st.divider()
+        render_session_comic(memory)
+
+        if memory.get("panel_data"):
+            display_emotional_arc(memory["panel_data"])
+
+        st.markdown('<div class="story-card">', unsafe_allow_html=True)
+        st.subheader("📖 Story Snapshot")
+        story_data = memory.get("story_data", {})
+        if story_data:
+            st.markdown(f"### {story_data.get('title', 'My Comic')}")
+            for section in ["introduction", "storyline", "climax", "resolution", "moral"]:
+                if story_data.get(section):
+                    st.markdown(f"**{section.capitalize()}:** {story_data[section]}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        if memory.get("evaluation_metrics"):
+            display_metrics(memory["evaluation_metrics"])
+
+        st.divider()
+        st.subheader("✏️ Edit Existing Comic (Session Memory)")
+
+        edit_mode_col1, edit_mode_col2 = st.columns([1.2, 1.8])
+        with edit_mode_col1:
+            auto_detect_panels = st.checkbox(
+                "Auto-detect affected panel(s)",
+                value=True,
+                help="If enabled, the app detects which panel(s) should change from your request."
+            )
+            selected_panel = st.selectbox(
+                "Manual panel target",
+                options=[i + 1 for i in range(len(memory.get("panel_data", [])))],
+                index=0,
+                disabled=auto_detect_panels
+            )
+        with edit_mode_col2:
+            edit_request = st.text_area(
+                "Follow-up instruction",
+                key="edit_request_input",
+                height=110,
+                placeholder="e.g., Change panel 2 so the hero wears a red jacket and update the dialogue to sound more confident."
+            )
+
+        apply_edit_btn = st.button("🔧 Apply Edit", type="secondary")
+
+        if apply_edit_btn:
+            if not edit_request.strip():
+                st.warning("Please provide an edit instruction.")
+            else:
+                try:
+                    working_memory = deepcopy(memory)
+                    target_panels = None if auto_detect_panels else [selected_panel - 1]
+
+                    with st.spinner("Analyzing and applying panel edit..."):
+                        edit_result = generate_panels.apply_edit_to_panels(
+                            edit_request=edit_request,
+                            panel_data=working_memory.get("panel_data", []),
+                            art_style=working_memory.get("art_style", "Anime Style"),
+                            story_data=working_memory.get("story_data", {}),
+                            target_panels=target_panels
+                        )
+
+                    updated_panels = edit_result.get("panel_data", working_memory.get("panel_data", []))
+                    affected_panels = edit_result.get("affected_panels", [])
+                    visual_panels = edit_result.get("visual_panels", [])
+
+                    if not affected_panels:
+                        st.info("No panel changes were required for this instruction.")
+                    else:
+                        working_memory["panel_data"] = updated_panels
+
+                        # Regenerate images only for visually affected panels.
+                        if visual_panels:
+                            img_generator = create_image_generator(
+                                char_image_path=working_memory.get("character_image_path"),
+                                ref_image_path=working_memory.get("reference_image_path"),
+                                character_description=working_memory.get("character_description", ""),
+                                character_name=working_memory.get("character_name", "")
+                            )
+
+                            for idx in visual_panels:
+                                current_paths = working_memory.get("image_paths", [])
+                                current_output = current_paths[idx] if idx < len(current_paths) else os.path.join(PANEL_FOLDER, f"panel_{idx+1:02d}.png")
+                                new_path = img_generator.generate_single_panel(
+                                    panel_data=updated_panels[idx],
+                                    art_style=working_memory.get("art_style", "Anime Style"),
+                                    panel_number=idx + 1,
+                                    output_path=current_output,
+                                    use_enhanced=True
+                                )
+                                if new_path:
+                                    working_memory["image_paths"][idx] = new_path
+
+                        working_memory = regenerate_comic_outputs(
+                            memory=working_memory,
+                            use_dynamic_layout=working_memory.get("use_dynamic_layout", True),
+                            evaluate=True
+                        )
+
+                        save_comic_memory(working_memory)
+
+                        affected_human = ", ".join([str(i + 1) for i in affected_panels])
+                        visual_human = ", ".join([str(i + 1) for i in visual_panels]) if visual_panels else "none"
+                        st.success(
+                            f"✅ Edit applied. Updated panel(s): {affected_human}. "
+                            f"Image regeneration called for panel(s): {visual_human}."
+                        )
+                        st.rerun()
+
+                except Exception as e:
+                    st.error(f"Failed to apply edit: {e}")
+                    with st.expander("Show Error Details"):
+                        st.code(traceback.format_exc())
+
+        st.divider()
+        st.subheader("⬇️ Download Current Comic")
+        dl_col1, dl_col2, dl_col3 = st.columns(3)
+
+        output_image_path = memory.get("output_image_path")
+        pdf_output_path = memory.get("pdf_output_path")
+
+        with dl_col1:
+            if output_image_path and os.path.exists(output_image_path):
+                with open(output_image_path, "rb") as img_file:
+                    st.download_button(
+                        label="📷 Download as PNG",
+                        data=img_file,
+                        file_name="comic_strip.png",
+                        mime="image/png",
+                        use_container_width=True
+                    )
+            else:
+                st.button("📷 PNG Unavailable", disabled=True, use_container_width=True)
+
+        with dl_col2:
+            if memory.get("pdf_created") and pdf_output_path and os.path.exists(pdf_output_path):
+                with open(pdf_output_path, "rb") as pdf_file:
+                    st.download_button(
+                        label="📄 Download as PDF",
+                        data=pdf_file,
+                        file_name="comic_strip.pdf",
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+            else:
+                st.button("📄 PDF Unavailable", disabled=True, use_container_width=True)
+
+        with dl_col3:
+            if st.button("🖼️ Export Panels", use_container_width=True):
+                panels_folder = os.path.join(OUTPUT_FOLDER, "individual_panels")
+                exported = process_comic.export_individual_panels(
+                    memory.get("image_paths", []),
+                    panels_folder,
+                    memory.get("panel_texts", [])
+                )
+                st.success(f"✅ Exported {len(exported)} panels to {panels_folder}")
 
 with tab2:
     st.subheader("📖 Comic Gallery")
@@ -1090,14 +1291,14 @@ with tab3:
     - **Action**: Large dynamic panels with motion lines
     - **Dramatic**: Splash pages for impact moments
     
-    #### 3. 🌍 Multi-Cultural Style Adaptation
-    Supports 15+ global comic traditions:
+    #### 3. 🌍 Curated Style Adaptation
+    Focused on stable, high-performing comic traditions:
     - 🇯🇵 Japanese Manga
-    - 🇰🇷 Korean Manhwa
-    - 🇨🇳 Chinese Manhua
+    - 🌸 Anime Style
     - 🇺🇸 American Superhero
     - 🇧🇪 Franco-Belgian
-    - And many more!
+    - 🎬 Film Noir
+    - 📱 Webtoon (Vertical)
     
     #### 4. 📏 Quality Evaluation Framework
     Novel metrics for assessing AI-generated comics:

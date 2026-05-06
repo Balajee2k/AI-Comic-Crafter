@@ -45,159 +45,86 @@ except OSError as e:
     raise OSError(f"❌ Failed to create output directory '{OUTPUT_DIR}': {e}")
 
 
-# Enhanced art style mappings with emotion modifiers - ALL 15 TRADITIONS
+# Stable style set tuned for panel consistency.
 STYLE_MAPPINGS = {
-    "Manga": {
-        "base": "High-contrast black and white sketch with sharp, clean lines, exaggerated facial expressions, and dramatic shading. Manga style, screen tones, Japanese comic aesthetic, speed lines",
-        "color_mode": "grayscale",
-        "keywords": ["manga", "Japanese comic", "screen tones", "expressive eyes"]
-    },
     "Manga (Japanese)": {
-        "base": "High-contrast black and white sketch with sharp, clean lines, exaggerated facial expressions, and dramatic shading. Manga style, screen tones, Japanese comic aesthetic, speed lines",
+        "base": "High-contrast black and white manga line art with clean inking, expressive faces, and controlled screentone shading. Keep panel readability and strong silhouette clarity",
         "color_mode": "grayscale",
-        "keywords": ["manga", "Japanese comic", "screen tones", "expressive eyes"]
-    },
-    "Anime": {
-        "base": "Vibrant colors with smooth cel shading, large expressive eyes, and detailed hair. Dynamic action poses with fluid motion lines. Anime style, Japanese animation aesthetic",
-        "color_mode": "vibrant",
-        "keywords": ["anime", "cel shading", "vibrant colors", "detailed hair"]
+        "keywords": ["manga", "screen tones", "clean lineart", "panel clarity"]
     },
     "Anime Style": {
-        "base": "Vibrant colors with smooth cel shading, large expressive eyes, and detailed hair. Dynamic action poses with fluid motion lines. Anime style, Japanese animation aesthetic",
+        "base": "Vibrant anime comic style with smooth cel shading, expressive eyes, readable action poses, and consistent character facial structure across panels",
         "color_mode": "vibrant",
-        "keywords": ["anime", "cel shading", "vibrant colors", "detailed hair"]
-    },
-    "American": {
-        "base": "Bold outlines with heavy inking, bright and saturated colors, and exaggerated muscular features. Classic American comic book style, dynamic compositions",
-        "color_mode": "saturated",
-        "keywords": ["American comic", "superhero style", "bold outlines", "dynamic"]
+        "keywords": ["anime", "cel shading", "consistent faces", "dynamic poses"]
     },
     "American Superhero": {
-        "base": "Bold outlines with heavy inking, bright and saturated colors, and exaggerated muscular features. Classic American superhero comic book style, dynamic splash pages, heroic poses",
+        "base": "Bold American superhero comic style with strong outlines, dramatic perspective, high readability, and consistent heroic proportions across panels",
         "color_mode": "saturated",
-        "keywords": ["American comic", "superhero style", "bold outlines", "dynamic"]
+        "keywords": ["american comic", "superhero", "bold outlines", "dramatic lighting"]
     },
-    "Belgian": {
-        "base": "Clean, clear lines with soft, flat shading. Rich and detailed backgrounds in a semi-realistic style, inspired by Tintin comics. Ligne claire style",
+    "Franco-Belgian (Tintin)": {
+        "base": "Franco-Belgian ligne claire style with clean contours, flat controlled colors, rich but readable backgrounds, and stable character design",
         "color_mode": "flat",
-        "keywords": ["Tintin style", "ligne claire", "detailed backgrounds", "European comic"]
-    },
-    "Franco-Belgian": {
-        "base": "Clean, clear lines with soft, flat shading. Rich and detailed backgrounds in a semi-realistic style, inspired by Tintin comics. Ligne claire style, European bande dessinée",
-        "color_mode": "flat",
-        "keywords": ["Tintin style", "ligne claire", "detailed backgrounds", "European comic"]
-    },
-    "Franco Belgian": {
-        "base": "Clean, clear lines with soft, flat shading. Rich and detailed backgrounds in a semi-realistic style, inspired by Tintin comics. Ligne claire style, European bande dessinée",
-        "color_mode": "flat",
-        "keywords": ["Tintin style", "ligne claire", "detailed backgrounds", "European comic"]
-    },
-    "Manhwa": {
-        "base": "Soft gradient shading, elongated elegant proportions, detailed fashion, pastel colors with vivid accents. Korean webtoon style, full color, realistic faces",
-        "color_mode": "soft",
-        "keywords": ["manhwa", "Korean comic", "webtoon", "elegant proportions"]
-    },
-    "Manhwa (Korean)": {
-        "base": "Soft gradient shading, elongated elegant proportions, detailed fashion, pastel colors with vivid accents. Korean webtoon style, full color, realistic faces",
-        "color_mode": "soft",
-        "keywords": ["manhwa", "Korean comic", "webtoon", "elegant proportions"]
-    },
-    "Manhua": {
-        "base": "Full color detailed illustration, martial arts aesthetic, flowing action lines, detailed traditional Chinese clothing, dynamic poses. Chinese comic manhua style",
-        "color_mode": "vibrant",
-        "keywords": ["manhua", "Chinese comic", "martial arts", "flowing lines"]
-    },
-    "Manhua (Chinese)": {
-        "base": "Full color detailed illustration, martial arts aesthetic, flowing action lines, detailed traditional Chinese clothing, dynamic poses. Chinese comic manhua style",
-        "color_mode": "vibrant",
-        "keywords": ["manhua", "Chinese comic", "martial arts", "flowing lines"]
-    },
-    "Horror": {
-        "base": "Dark atmospheric illustration, heavy dramatic shadows, unsettling compositions, detailed grotesque elements. Horror comic style, muted colors with red accents",
-        "color_mode": "dark",
-        "keywords": ["horror", "dark", "atmospheric", "shadows"]
-    },
-    "Horror Comics": {
-        "base": "Dark atmospheric illustration, heavy dramatic shadows, unsettling compositions, detailed grotesque elements. Horror comic style, muted colors with red accents",
-        "color_mode": "dark",
-        "keywords": ["horror", "dark", "atmospheric", "shadows"]
-    },
-    "Noir": {
-        "base": "High contrast black and white, dramatic film noir lighting, heavy silhouettes, minimal mid-tones. Noir comic style, cynical atmosphere",
-        "color_mode": "high_contrast_bw",
-        "keywords": ["noir", "film noir", "high contrast", "shadows"]
-    },
-    "Film Noir": {
-        "base": "High contrast black and white, dramatic film noir lighting, heavy silhouettes, minimal mid-tones. Classic film noir comic style, cynical detective atmosphere",
-        "color_mode": "high_contrast_bw",
-        "keywords": ["noir", "film noir", "high contrast", "shadows"]
-    },
-    "Webcomic": {
-        "base": "Simple stylized character designs, expressive faces, minimal backgrounds, casual approachable aesthetic. Modern webcomic style",
-        "color_mode": "simple",
-        "keywords": ["webcomic", "simple", "expressive", "casual"]
-    },
-    "Webcomic Modern": {
-        "base": "Clean digital art, consistent flat colors, simplified stylized backgrounds, meme-friendly expressive faces. Modern webcomic style",
-        "color_mode": "simple",
-        "keywords": ["webcomic", "simple", "expressive", "casual"]
-    },
-    "Webtoon": {
-        "base": "Vertical scroll optimized, full color with soft shading, dramatic emotional pacing, mobile-friendly compositions. Korean webtoon digital style",
-        "color_mode": "soft",
-        "keywords": ["webtoon", "vertical scroll", "full color", "dramatic"]
+        "keywords": ["ligne claire", "tintin style", "clean lines", "detailed backgrounds"]
     },
     "Webtoon (Vertical)": {
-        "base": "Vertical scroll optimized, full color with soft shading, dramatic emotional pacing, mobile-friendly compositions. Korean webtoon digital style",
+        "base": "Modern webtoon style with soft gradients, full color, clean digital linework, and composition optimized for sequential panel storytelling",
         "color_mode": "soft",
-        "keywords": ["webtoon", "vertical scroll", "full color", "dramatic"]
+        "keywords": ["webtoon", "digital comic", "soft shading", "sequential readability"]
     },
-    "Newspaper": {
-        "base": "Simple clear line art, limited color palette, punchy compact compositions, 3-4 panel format. Classic newspaper comic strip style like Peanuts or Calvin and Hobbes",
-        "color_mode": "simple",
-        "keywords": ["newspaper comic", "daily strip", "simple lines", "humor"]
-    },
-    "Newspaper Strip": {
-        "base": "Simple clear line art, limited color palette, punchy compact compositions, 3-4 panel format. Classic newspaper comic strip style like Peanuts or Calvin and Hobbes",
-        "color_mode": "simple",
-        "keywords": ["newspaper comic", "daily strip", "simple lines", "humor"]
-    },
-    "Golden Age": {
-        "base": "Vintage 1940s comic aesthetic, limited bold primary color palette, classic heroic poses, retro halftone dot patterns. Golden age superhero comic style",
-        "color_mode": "vintage",
-        "keywords": ["golden age", "vintage", "retro", "classic superhero"]
-    },
-    "Underground": {
-        "base": "Counter-culture aesthetic, exaggerated grotesque features, psychedelic elements, bold experimental linework. Underground comix style like R. Crumb",
-        "color_mode": "psychedelic",
-        "keywords": ["underground", "comix", "psychedelic", "alternative"]
-    },
-    "Underground Comix": {
-        "base": "Counter-culture aesthetic, exaggerated grotesque features, psychedelic elements, bold experimental linework. Underground comix style like R. Crumb",
-        "color_mode": "psychedelic",
-        "keywords": ["underground", "comix", "psychedelic", "alternative"]
-    },
-    "Childrens": {
-        "base": "Soft rounded character shapes, bright primary colors, simple friendly expressions, educational friendly style. Children's book illustration style",
-        "color_mode": "bright",
-        "keywords": ["children's book", "cute", "simple", "friendly"]
-    },
-    "Children's Illustrated": {
-        "base": "Soft rounded character shapes, bright primary colors, simple friendly expressions, educational friendly style. Children's book illustration style",
-        "color_mode": "bright",
-        "keywords": ["children's book", "cute", "simple", "friendly"]
-    },
-    "Indie": {
-        "base": "Artistic experimental style, muted earth tones, literary focus, unique personal aesthetic, introspective mood. Indie graphic novel style",
-        "color_mode": "muted",
-        "keywords": ["indie", "graphic novel", "artistic", "literary"]
-    },
-    "Indie Graphic Novel": {
-        "base": "Artistic experimental style, muted earth tones, literary focus, unique personal aesthetic, introspective mood. Indie graphic novel style",
-        "color_mode": "muted",
-        "keywords": ["indie", "graphic novel", "artistic", "literary"]
+    "Film Noir": {
+        "base": "Cinematic film noir comic style with high-contrast values, dramatic shadows, rain-soaked atmosphere, and strong visual storytelling clarity",
+        "color_mode": "high_contrast_bw",
+        "keywords": ["noir", "high contrast", "dramatic shadows", "cinematic"]
     }
 }
+
+# Backward-compatible aliases map older style names to stable canonical styles.
+LEGACY_STYLE_ALIASES = {
+    "manga": "Manga (Japanese)",
+    "anime": "Anime Style",
+    "american": "American Superhero",
+    "belgian": "Franco-Belgian (Tintin)",
+    "franco-belgian": "Franco-Belgian (Tintin)",
+    "franco belgian": "Franco-Belgian (Tintin)",
+    "manhwa": "Webtoon (Vertical)",
+    "manhua": "Anime Style",
+    "webcomic": "Webtoon (Vertical)",
+    "webtoon": "Webtoon (Vertical)",
+    "horror": "Film Noir",
+    "horror comics": "Film Noir",
+    "noir": "Film Noir",
+    "newspaper": "Franco-Belgian (Tintin)",
+    "newspaper strip": "Franco-Belgian (Tintin)",
+    "golden age": "American Superhero",
+    "underground": "Film Noir",
+    "underground comix": "Film Noir",
+    "childrens": "Anime Style",
+    "children's illustrated": "Anime Style",
+    "indie": "Film Noir",
+    "indie graphic novel": "Film Noir"
+}
+
+
+def resolve_style_name(art_style: str) -> str:
+    """Resolve input style names to canonical stable styles."""
+    if art_style in STYLE_MAPPINGS:
+        return art_style
+
+    lowered = (art_style or "").strip().lower()
+    if lowered in LEGACY_STYLE_ALIASES:
+        return LEGACY_STYLE_ALIASES[lowered]
+
+    normalized = lowered.replace("-", " ")
+    if normalized in LEGACY_STYLE_ALIASES:
+        return LEGACY_STYLE_ALIASES[normalized]
+
+    if "(" in art_style:
+        base = art_style.split("(")[0].strip().lower()
+        if base in LEGACY_STYLE_ALIASES:
+            return LEGACY_STYLE_ALIASES[base]
+
+    return "Anime Style"
 
 # Emotion to visual modifier mappings
 EMOTION_VISUAL_MODIFIERS = {
@@ -284,7 +211,6 @@ class EnhancedImageGenerator:
         elif isinstance(image_or_path, Image.Image):
             self.style_reference = image_or_path
             print("✅ Style reference image set.")
-        print("✅ Style reference image set.")
     
     def set_character_description(self, description: str, name: str = "main_character"):
         """
@@ -312,24 +238,8 @@ class EnhancedImageGenerator:
         # Get base description
         description = panel_data.get("Description", "")
         
-        # Get style base - try multiple variations of the style name
-        style_info = None
-        style_variations = [
-            art_style,
-            art_style.replace(" ", "-"),
-            art_style.replace("-", " "),
-            art_style.split("(")[0].strip(),  # Remove parenthetical
-            art_style.title()
-        ]
-        
-        for style_var in style_variations:
-            if style_var in STYLE_MAPPINGS:
-                style_info = STYLE_MAPPINGS[style_var]
-                break
-        
-        if not style_info:
-            print(f"⚠️ Style '{art_style}' not found, using Anime as fallback")
-            style_info = STYLE_MAPPINGS["Anime"]
+        canonical_style = resolve_style_name(art_style)
+        style_info = STYLE_MAPPINGS[canonical_style]
         
         style_base = style_info["base"]
         
@@ -392,9 +302,7 @@ class EnhancedImageGenerator:
         """
         print(f"--- Starting Enhanced Image Generation for Style: {art_style} ---")
         
-        if art_style not in STYLE_MAPPINGS:
-            print(f"⚠️ Unknown art style '{art_style}', defaulting to 'Anime'")
-            art_style = "Anime"
+        art_style = resolve_style_name(art_style)
         
         if not isinstance(panel_data, list) or not panel_data:
             print(f"❌ Invalid or empty panel_data received")
@@ -437,6 +345,39 @@ class EnhancedImageGenerator:
         print(f"   Successfully generated {len(image_paths)} images.")
         
         return image_paths
+
+    def generate_single_panel(self,
+                              panel_data: Dict,
+                              art_style: str,
+                              panel_number: int,
+                              output_path: Optional[str] = None,
+                              use_enhanced: bool = True) -> Optional[str]:
+        """Generate or regenerate exactly one panel image."""
+        if not isinstance(panel_data, dict) or "Description" not in panel_data:
+            print("❌ Invalid panel data for single panel generation.")
+            return None
+
+        resolved_style = resolve_style_name(art_style)
+
+        if use_enhanced:
+            full_prompt = self.build_enhanced_prompt(panel_data, resolved_style)
+        else:
+            style_base = STYLE_MAPPINGS[resolved_style]["base"]
+            full_prompt = f"{panel_data.get('Description', '')}.\nArt Style: {style_base}.\n{SYSTEM_INSTRUCTIONS}"
+
+        generated_path = self._generate_single_image(full_prompt, panel_number, panel_data)
+        if not generated_path:
+            return None
+
+        if output_path and output_path != generated_path:
+            try:
+                with Image.open(generated_path) as img:
+                    img.save(output_path, format="PNG")
+                return output_path
+            except Exception as e:
+                print(f"⚠️ Could not copy regenerated panel to target path: {e}")
+
+        return generated_path
     
     def _generate_single_image(self, prompt: str, panel_num: int, 
                                 panel_data: Dict = None) -> Optional[str]:
@@ -636,25 +577,8 @@ def generate_images(panel_data: List[Dict], art_style: str) -> List[str]:
     print(f"--- Starting Image Generation for Style: {art_style} ---")
 
     # Try to find matching style - be flexible with naming
-    style_info = None
-    style_variations = [
-        art_style,
-        art_style.replace(" ", "-"),
-        art_style.replace("-", " "),
-        art_style.split("(")[0].strip(),
-        art_style.title(),
-        "Anime"  # Fallback
-    ]
-    
-    for style_var in style_variations:
-        if style_var in STYLE_MAPPINGS:
-            style_info = STYLE_MAPPINGS[style_var]
-            art_style = style_var  # Use the matched key
-            break
-    
-    if not style_info:
-        print(f"⚠️ Style '{art_style}' not found in mappings, using Anime fallback")
-        style_info = STYLE_MAPPINGS["Anime"]
+    art_style = resolve_style_name(art_style)
+    style_info = STYLE_MAPPINGS[art_style]
 
     if not isinstance(panel_data, list) or not panel_data:
         print(f"❌ Invalid or empty panel_data received: {panel_data}")

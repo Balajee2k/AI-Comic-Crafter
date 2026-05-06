@@ -16,6 +16,7 @@ Research Contributions:
 
 import os
 import re
+import json
 from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 from dotenv import load_dotenv
@@ -92,8 +93,8 @@ class EnhancedPanelGenerator:
     def _configure_gemini(self):
         """Configure Gemini API."""
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel("gemini-2.5-flash")
-        self.lite_model = genai.GenerativeModel("gemini-2.5-flash")
+        self.model = genai.GenerativeModel("gemini-3-flash-preview")
+        self.lite_model = genai.GenerativeModel("gemini-3-flash-preview")
     
     def set_style(self, style_name: str):
         """Set the comic style/tradition."""
@@ -463,7 +464,7 @@ def generate_panels(scenario: str, art_style: str, num_panels: int = 6) -> List[
     genai.configure(api_key=api_key)
     
     formatted_prompt = template.format(scenario=scenario, art_style=art_style, num_panels=num_panels)
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model = genai.GenerativeModel("gemini-3-flash-preview")
     response = model.generate_content(formatted_prompt)
     
     if not response or not response.text:
@@ -563,7 +564,7 @@ def generate_story(scenario: str, art_style: str) -> Dict[str, str]:
     genai.configure(api_key=api_key)
     
     formatted_prompt = template.format(scenario=scenario, art_style=art_style)
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model = genai.GenerativeModel("gemini-3-flash-preview")
     response = model.generate_content(formatted_prompt)
     
     if not response or not response.text:
@@ -582,6 +583,356 @@ def extract_story_info(text):
         if section_name in ["title", "introduction", "storyline", "climax", "moral"]:
             story_info[section_name] = section_content
     return story_info
+
+
+def _strip_code_fences(text: str) -> str:
+    """Remove markdown fences from model responses."""
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```[a-zA-Z]*\n", "", cleaned)
+        cleaned = re.sub(r"\n```$", "", cleaned)
+    return cleaned.strip()
+
+
+def _parse_json_object(text: str) -> Dict[str, Any]:
+    """Best-effort JSON extraction for model responses."""
+    cleaned = _strip_code_fences(text)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+        if not match:
+            raise
+        return json.loads(match.group(0))
+
+
+def generate_surprise_story_seed(art_style: str, num_panels: int = 6) -> Dict[str, str]:
+    """
+    Generate a fully-formed story seed for the "Surprise Me" UX.
+
+    Returns keys used directly by the app:
+    - prompt
+    - genre
+    - mood
+    - audience
+    - characters
+    - title
+    """
+    load_dotenv()
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError("Please set the GOOGLE_API_KEY environment variable.")
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-3-flash-preview")
+
+    template = """
+    You are a creative story generator for comic creation tools.
+
+    Create a complete, original comic concept suitable for exactly {num_panels} panels.
+    Art style context: {art_style}
+
+    Return ONLY valid JSON with this exact schema:
+    {{
+      "title": "string",
+      "genre": "one of: Comedy, Adventure, Drama, Horror, Romance, Sci-Fi, Fantasy, Slice of Life",
+      "mood": "one of: Light-hearted, Serious, Dramatic, Mysterious, Exciting, Emotional",
+      "audience": "one of: General, Children, Young Adult, Adult, All Ages",
+      "characters": "2-4 bullet-style character descriptions in one paragraph",
+      "prompt": "A 4-6 sentence comic-ready story prompt with clear setup, conflict, climax, and resolution"
+    }}
+    """
+
+    response = model.generate_content(template.format(art_style=art_style, num_panels=num_panels))
+    if not response or not response.text:
+        raise Exception("Failed to generate surprise story.")
+
+    try:
+        data = _parse_json_object(response.text)
+    except Exception:
+        repair_prompt = """
+        Convert the text below into STRICT JSON that matches this schema exactly.
+        Use double quotes for all keys and string values. Return ONLY JSON.
+
+        Schema:
+        {
+          "title": "string",
+          "genre": "one of: Comedy, Adventure, Drama, Horror, Romance, Sci-Fi, Fantasy, Slice of Life",
+          "mood": "one of: Light-hearted, Serious, Dramatic, Mysterious, Exciting, Emotional",
+          "audience": "one of: General, Children, Young Adult, Adult, All Ages",
+          "characters": "2-4 bullet-style character descriptions in one paragraph",
+          "prompt": "A 4-6 sentence comic-ready story prompt with clear setup, conflict, climax, and resolution"
+        }
+
+        Text:
+        {raw_text}
+        """
+
+        fix_response = model.generate_content(repair_prompt.format(raw_text=response.text))
+        if not fix_response or not fix_response.text:
+            raise Exception("Failed to normalize surprise story output.")
+        data = _parse_json_object(fix_response.text)
+
+    return {
+        "title": str(data.get("title", "Untitled Story")).strip(),
+        "genre": str(data.get("genre", "Adventure")).strip(),
+        "mood": str(data.get("mood", "Exciting")).strip(),
+        "audience": str(data.get("audience", "General")).strip(),
+        "characters": str(data.get("characters", "")).strip(),
+        "prompt": str(data.get("prompt", "A hero faces a challenge and grows through it.")).strip(),
+    }
+
+
+def detect_affected_panels(edit_request: str, panel_data: List[Dict]) -> List[int]:
+    """
+    Detect which panels are affected by a follow-up edit request.
+    Returns zero-based panel indexes.
+    """
+    if not panel_data:
+        return []
+
+    # Fast deterministic path for explicit mentions like "panel 3".
+    explicit_numbers = re.findall(r"panel\s*(\d+)", edit_request.lower())
+    if explicit_numbers:
+        idxs = []
+        for panel_num in explicit_numbers:
+            idx = int(panel_num) - 1
+            if 0 <= idx < len(panel_data):
+                idxs.append(idx)
+        if idxs:
+            return sorted(set(idxs))
+
+    load_dotenv()
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        return list(range(len(panel_data)))
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-3-flash-preview")
+
+    panel_summary_lines = []
+    for i, panel in enumerate(panel_data, start=1):
+        panel_summary_lines.append(
+            f"Panel {i}: Desc={panel.get('Description', '')[:140]} | Text={panel.get('Text', '...')[:120]}"
+        )
+
+    prompt = """
+    Given this edit request and current comic panels, identify the MINIMUM affected panels.
+
+    Edit request:
+    {edit_request}
+
+    Panels:
+    {panels}
+
+    Return ONLY valid JSON in this format:
+    {{"panel_numbers": [1, 2]}}
+
+    Rules:
+    - If a single panel change is enough, return one panel only.
+    - Prefer minimal changes.
+    - Use 1-based panel numbers.
+    """.format(edit_request=edit_request, panels="\n".join(panel_summary_lines))
+
+    try:
+        response = model.generate_content(prompt)
+        if not response or not response.text:
+            return list(range(len(panel_data)))
+
+        data = _parse_json_object(response.text)
+        numbers = data.get("panel_numbers", [])
+        idxs = []
+        for number in numbers:
+            try:
+                idx = int(number) - 1
+                if 0 <= idx < len(panel_data):
+                    idxs.append(idx)
+            except (TypeError, ValueError):
+                continue
+
+        return sorted(set(idxs)) if idxs else list(range(len(panel_data)))
+    except Exception:
+        return list(range(len(panel_data)))
+
+
+def _normalize_panel_for_edit(panel: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensure panel schema consistency after edit."""
+    normalized = dict(panel)
+
+    emotion = str(normalized.get("emotion", normalized.get("Emotion", "neutral"))).lower().strip()
+    normalized["emotion"] = emotion if emotion else "neutral"
+    normalized["Emotion"] = normalized["emotion"]
+
+    if "Text" not in normalized or not normalized.get("Text"):
+        normalized["Text"] = "..."
+    if "Description" not in normalized or not normalized.get("Description"):
+        normalized["Description"] = "Scene continues with the story."
+
+    if "relative_size" not in normalized:
+        normalized["relative_size"] = "medium"
+    if "emotion_intensity" not in normalized:
+        normalized["emotion_intensity"] = 0.5
+    if "characters" not in normalized:
+        normalized["characters"] = []
+    if "prompt_modifiers" not in normalized:
+        normalized["prompt_modifiers"] = ""
+
+    return normalized
+
+
+def apply_edit_to_panels(edit_request: str,
+                         panel_data: List[Dict],
+                         art_style: str,
+                         story_data: Optional[Dict] = None,
+                         target_panels: Optional[List[int]] = None) -> Dict[str, Any]:
+    """
+    Apply a targeted edit request to specific panels only.
+
+    Returns dict:
+    - panel_data: updated panel list
+    - affected_panels: zero-based indexes touched by the editor
+    - visual_panels: subset that require image re-generation
+    """
+    if not panel_data:
+        return {"panel_data": [], "affected_panels": [], "visual_panels": []}
+
+    working_panels = [_normalize_panel_for_edit(p) for p in panel_data]
+
+    if target_panels is None:
+        target_panels = detect_affected_panels(edit_request, working_panels)
+
+    target_panels = sorted(set(i for i in target_panels if 0 <= i < len(working_panels)))
+    if not target_panels:
+        return {
+            "panel_data": working_panels,
+            "affected_panels": [],
+            "visual_panels": []
+        }
+
+    load_dotenv()
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError("Please set the GOOGLE_API_KEY environment variable.")
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-3-flash-preview")
+
+    targeted_payload = []
+    full_panel_context = []
+    for idx, panel in enumerate(working_panels):
+        full_panel_context.append({
+            "panel_number": idx + 1,
+            "Description": panel.get("Description", ""),
+            "Text": panel.get("Text", "..."),
+            "emotion": panel.get("emotion", "neutral")
+        })
+
+    for idx in target_panels:
+        panel = working_panels[idx]
+        targeted_payload.append({
+            "panel_number": idx + 1,
+            "Description": panel.get("Description", ""),
+            "Text": panel.get("Text", "..."),
+            "emotion": panel.get("emotion", "neutral"),
+            "relative_size": panel.get("relative_size", "medium"),
+            "prompt_modifiers": panel.get("prompt_modifiers", "")
+        })
+
+    prompt = """
+    You are a comic editor assistant.
+
+    Task:
+    Update ONLY the specified target panels according to the user's edit request.
+    Preserve story continuity and character consistency with the rest of the comic.
+    Keep unchanged panels untouched.
+
+    Art style: {art_style}
+    Story context: {story_context}
+
+    User edit request:
+    {edit_request}
+
+    Full comic context (read-only):
+    {full_context}
+
+    Target panels:
+    {target_payload}
+
+    Return ONLY valid JSON:
+    {{
+      "updated_panels": [
+        {{
+          "panel_number": 2,
+          "Description": "...",
+          "Text": "...",
+          "emotion": "neutral",
+          "relative_size": "medium",
+          "prompt_modifiers": "",
+          "visual_change": true
+        }}
+      ]
+    }}
+
+    Rules:
+    - Include only target panels in updated_panels.
+    - Set visual_change=true only when image content must change.
+    - For dialogue-only edits, set visual_change=false.
+    """.format(
+        art_style=art_style,
+        story_context=json.dumps(story_data or {}, ensure_ascii=True),
+        edit_request=edit_request,
+        full_context=json.dumps(full_panel_context, ensure_ascii=True),
+        target_payload=json.dumps(targeted_payload, ensure_ascii=True)
+    )
+
+    response = model.generate_content(prompt)
+    if not response or not response.text:
+        raise Exception("Failed to apply edit request.")
+
+    data = _parse_json_object(response.text)
+    updated_panels_payload = data.get("updated_panels", [])
+
+    visual_panels = []
+    affected_panels = []
+
+    for entry in updated_panels_payload:
+        try:
+            panel_number = int(entry.get("panel_number", 0))
+        except (TypeError, ValueError):
+            continue
+
+        idx = panel_number - 1
+        if idx not in target_panels:
+            continue
+
+        merged = dict(working_panels[idx])
+        merged["Description"] = str(entry.get("Description", merged.get("Description", ""))).strip()
+        merged["Text"] = str(entry.get("Text", merged.get("Text", "..."))).strip()
+        merged["emotion"] = str(entry.get("emotion", merged.get("emotion", "neutral"))).strip().lower()
+        merged["Emotion"] = merged["emotion"]
+        merged["relative_size"] = str(entry.get("relative_size", merged.get("relative_size", "medium"))).strip().lower()
+        merged["prompt_modifiers"] = str(entry.get("prompt_modifiers", merged.get("prompt_modifiers", ""))).strip()
+
+        working_panels[idx] = _normalize_panel_for_edit(merged)
+        affected_panels.append(idx)
+
+        visual_change = bool(entry.get("visual_change", True))
+        if visual_change:
+            visual_panels.append(idx)
+
+    # If model response is malformed, fall back to applying the edit to target panel text only.
+    if not affected_panels:
+        first_idx = target_panels[0]
+        fallback_panel = dict(working_panels[first_idx])
+        fallback_panel["Text"] = f"{fallback_panel.get('Text', '...')} (Edited: {edit_request[:60]})"
+        working_panels[first_idx] = _normalize_panel_for_edit(fallback_panel)
+        affected_panels = [first_idx]
+
+    return {
+        "panel_data": working_panels,
+        "affected_panels": sorted(set(affected_panels)),
+        "visual_panels": sorted(set(visual_panels))
+    }
 
 
 if __name__ == '__main__':

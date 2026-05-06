@@ -632,6 +632,21 @@ def create_comic_pdf(comic_image_path: str,
     if not os.path.exists(comic_image_path):
         print(f"❌ Comic image not found: {comic_image_path}")
         return False
+
+    def build_emotional_arc_summary(panels: List[Dict]) -> Tuple[str, float]:
+        """Return emotion flow text and average intensity."""
+        if not panels:
+            return "", 0.0
+
+        emotions = [str(p.get("emotion", "neutral")).upper() for p in panels]
+        intensities = [p.get("emotion_intensity", p.get("intensity", 0.5)) for p in panels]
+        try:
+            intensity_avg = sum(float(x) for x in intensities) / len(intensities)
+        except Exception:
+            intensity_avg = 0.0
+
+        flow = " -> ".join(emotions)
+        return flow, intensity_avg
     
     try:
         # Create document
@@ -675,6 +690,29 @@ def create_comic_pdf(comic_image_path: str,
         comic_img = RLImage(comic_image_path, width=display_width, height=display_height)
         comic_img.hAlign = 'CENTER'
         story_elements.append(comic_img)
+
+        # Add emotional arc below the comic image if panel data exists
+        if panel_data:
+            arc_flow, intensity_avg = build_emotional_arc_summary(panel_data)
+            story_elements.append(Spacer(1, 12))
+            story_elements.append(Paragraph("Emotional Arc", styles['Heading2']))
+            story_elements.append(Spacer(1, 6))
+            if arc_flow:
+                story_elements.append(Paragraph(f"<b>Emotion Flow:</b> {arc_flow}", styles['Normal']))
+                story_elements.append(Spacer(1, 6))
+
+            arc_table = Table(
+                [["Average Intensity", f"{intensity_avg:.0%}"]],
+                colWidths=[3*inch, 1.5*inch]
+            )
+            arc_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 11),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.black)
+            ]))
+            story_elements.append(arc_table)
         
         # Add story sections on new page if available
         if story_data:
